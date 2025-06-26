@@ -8,16 +8,6 @@ type OrderTableProps = {
     existingOrders: OrderItem[];
 };
 
-// type OrderBookType = {
-//     asks: OrderItem[];
-//     bids: OrderItem[];
-// };
-
-// type OrderType = {
-//     asks: [number, number][];
-//     bids: [number, number][];
-// };
-
 const ColorMap = {
     bids: {
         textColor: "text-green-600",
@@ -85,45 +75,48 @@ export const OrderTable = (props: OrderTableProps) => {
                                         areFloatsEqual(newOrder[1], order[1])
                                 );
 
-                                const textColor = isNewOrder
+                                const textColorClass = isNewOrder
                                     ? "text-orange-300"
-                                    : orderColor.textColor;
+                                    : "text-gray-500"; // default gray text
+
+                                // const hoverTextColor = orderColor.textColor; // green or red
+                                const hoverTextColor =
+                                    orderType === "asks"
+                                        ? "group-hover:text-red-600"
+                                        : "group-hover:text-green-600";
 
                                 return (
-                                    <tr key={index}>
+                                    <tr
+                                        key={index}
+                                        className={`group relative font-mono`}
+                                        style={{
+                                            background: `linear-gradient(to right, ${orderColor.background} ${sizePercentage}%, transparent ${sizePercentage}%)`, // Tailwind gray-100
+                                        }}
+                                    >
                                         <td
-                                            className={`border border-gray-300 p-[10px] ${textColor} ${
+                                            className={`border border-gray-300 p-[10px] ${hoverTextColor} ${
                                                 isNewOrder
-                                                    ? "font-bold"
-                                                    : "font-semibold"
+                                                    ? "text-orange-300"
+                                                    : orderColor.textColor
                                             }`}
-                                            style={{
-                                                background: `linear-gradient(to right, ${orderColor.background} ${sizePercentage}%, transparent ${sizePercentage}%)`,
-                                            }}
                                         >
                                             {order[0]}
                                         </td>
                                         <td
-                                            className={`border border-gray-300 p-[10px] ${textColor} opacity-70 hover:opacity-100  ${
+                                            className={`border border-gray-300 p-[10px] opacity-70 hover:opacity-100  ${hoverTextColor} ${
                                                 isNewOrder
-                                                    ? "font-bold"
-                                                    : "opacity-70"
+                                                    ? "text-orange-300"
+                                                    : textColorClass
                                             }`}
-                                            style={{
-                                                background: `linear-gradient(to right, ${orderColor.background} ${sizePercentage}%, transparent ${sizePercentage}%)`,
-                                            }}
                                         >
                                             {order[1]}
                                         </td>
                                         <td
-                                            className={`border border-gray-300 p-[10px] ${textColor}  hover:opacity-100 ${
+                                            className={`border border-gray-300 p-[10px] opacity-70 hover:opacity-100  ${hoverTextColor} ${
                                                 isNewOrder
-                                                    ? "font-bold"
-                                                    : "opacity-70"
+                                                    ? "text-orange-300"
+                                                    : textColorClass
                                             }`}
-                                            style={{
-                                                background: `linear-gradient(to right, ${orderColor.background} ${sizePercentage}%, transparent ${sizePercentage}%)`,
-                                            }}
                                         >
                                             {runningTotal.toFixed(2)}
                                         </td>

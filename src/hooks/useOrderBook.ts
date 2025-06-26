@@ -77,8 +77,8 @@ export function useOrderBook(frequency: number = 1000): OrderTableType {
                 }
 
                 // Simulate fake new orders
-                newAsks.push([Math.floor(200000 + Math.random() * 100), 0]);
-                newBids.push([Math.floor(200000 + Math.random() * 100), 0]);
+                // newAsks.push([Math.floor(200000 + Math.random() * 100), 0]);
+                // newBids.push([Math.floor(200000 + Math.random() * 100), 0]);
 
                 // Save current order for next comparison
                 previousOrderRef.current = newOrder;
