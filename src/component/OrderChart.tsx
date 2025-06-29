@@ -8,38 +8,40 @@ import {
     CartesianGrid,
     Bar,
 } from "recharts";
+import type { OrderItem } from "../types/order";
 
 type ChartPoint = {
     price: number;
-    orderPercent?: number; // goes up
+    orderPercent?: number;
     orderSize?: number;
-    isAsk?: boolean; // true for asks, false for bids
+    type: "bid" | "ask";
+    id: string;
+    isNew?: boolean;
 };
 
 type OrderChartProps = {
-    orderType: "bids" | "asks";
-    orders: [number, number][];
+    orders: OrderItem[];
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
 
-    const { price, orderSize, orderPercent, isAsk } = payload[0].payload;
+    const { price, orderSize, orderPercent, type } = payload[0].payload;
     return (
-        <div className="bg-white border border-gray-300 px-4 py-2 rounded font-mono shadow-md">
+        <div className="bg-white/5 border border-gray-300/60 px-6 py-3 rounded font-mono shadow-md">
             <p
-                className={`mb-1  font-semibold text-sm ${
-                    isAsk ? "text-red-500" : "text-green-500"
+                className={`mb-1 font-semibold text-sm ${
+                    type === "ask" ? "text-red-500" : "text-green-500"
                 }`}
             >{`$${price}`}</p>
             {orderSize !== undefined && (
-                <div className="">
+                <div>
                     <div className="flex justify-between items-center text-xs">
-                        <div className="mr-3 text-gray-500">Size</div>
+                        <div className="mr-3 text-white/80">Size</div>
                         <div>{orderSize}</div>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                        <div className="mr-3 text-gray-500">Percent</div>
+                        <div className="mr-3 text-white/80">Percent</div>
                         <div>{orderPercent?.toFixed(2)}%</div>
                     </div>
                 </div>
@@ -48,21 +50,22 @@ const CustomTooltip = ({ active, payload }: any) => {
     );
 };
 
-export const OrderChart = ({ orderType, orders }: OrderChartProps) => {
-    const isAsk = orderType === "asks";
-    const { data, maxPercent, minPrize, maxPrize } = useMemo(() => {
-        const totalAsk = orders.reduce((acc, [, size]) => acc + size, 0);
+export const OrderChart = ({ orders }: OrderChartProps) => {
+    const { data, maxPercent, lowerBound, upperBound } = useMemo(() => {
+        const totalAsk = orders.reduce((acc, order) => acc + order.size, 0);
         const priceSet = new Set<number>();
         const map = new Map<number, ChartPoint>();
 
-        for (const [price, size] of orders) {
-            priceSet.add(price);
-            map.set(price, {
-                ...map.get(price),
-                price,
-                orderPercent: (size / totalAsk) * 100,
-                orderSize: size,
-                isAsk,
+        for (const order of orders) {
+            priceSet.add(order.price);
+            map.set(order.price, {
+                ...map.get(order.price),
+                price: order.price,
+                orderPercent: (order.size / totalAsk) * 100,
+                orderSize: order.size,
+                type: order.type,
+                id: order.id,
+                isNew: order.isNew,
             });
         }
 
@@ -71,32 +74,37 @@ export const OrderChart = ({ orderType, orders }: OrderChartProps) => {
             .sort((a, b) => a.price - b.price);
 
         const maxAsk = Math.max(...data.map((d) => d.orderPercent || 0));
-        const maxPercent = Math.ceil(maxAsk / 1) + 1;
+        const maxPercent = Math.ceil(maxAsk / 1);
         const maxPrize = Math.max(...data.map((d) => d.price));
         const minPrize = Math.min(...data.map((d) => d.price));
 
-        return { data, maxPercent, minPrize, maxPrize };
-    }, [orders, isAsk]);
+        const diff = maxPrize - minPrize;
+        const lowerBound = Math.floor(minPrize - diff * 0.02);
+        const upperBound = Math.ceil(maxPrize + diff * 0.02);
+
+        return { data, maxPercent, lowerBound, upperBound };
+    }, [orders]);
 
     return (
         <ResponsiveContainer width="100%" height={300}>
             <ComposedChart
                 data={data}
-                barCategoryGap={0}
-                barGap={0}
-                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                barCategoryGap={20}
+                barGap={5}
+                margin={{ top: 4, right: 30, bottom: 20, left: 20 }}
             >
-                <CartesianGrid strokeDasharray="4 4" opacity={0.5} />
+                <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis
                     dataKey="price"
                     type="number"
-                    domain={[minPrize - 2, maxPrize + 2]}
-                    className="font-mono text-xs"
-                    tickFormatter={(v) => v.toFixed(0)}
+                    domain={[lowerBound, upperBound]}
+                    className="font-mono text-xs overflow-visible"
+                    tickCount={12}
+                    tickFormatter={(value) => `$${value.toLocaleString()}`}
                     label={{
-                        value: isAsk ? "Asks Price" : "Bids Price",
+                        value: "Spread Chart",
                         position: "insideBottom",
-                        offset: -5,
+                        dy: 20,
                         className: "font-mono font-semibold text-sm",
                     }}
                 />
@@ -104,6 +112,8 @@ export const OrderChart = ({ orderType, orders }: OrderChartProps) => {
                     domain={[0, maxPercent]}
                     tickFormatter={(v) => `${Math.abs(v)}%`}
                     className="font-mono text-xs"
+                    tickCount={18}
+                    allowDecimals={false}
                     label={{
                         value: "Size Percent",
                         angle: -90,
@@ -115,19 +125,26 @@ export const OrderChart = ({ orderType, orders }: OrderChartProps) => {
                 <Tooltip content={<CustomTooltip />} />
                 <Bar
                     dataKey="orderPercent"
-                    fill={isAsk ? "#ef4444" : "#22c55e"}
-                    maxBarSize={60}
+                    maxBarSize={40}
                     isAnimationActive={false}
                     shape={(props: any) => {
-                        const { x, y, height } = props;
-                        const barWidth = 2; // Make this thicker if needed
+                        const { x, y, height, isNew, type } = props;
+                        const barWidth = 5; // Make this thicker if needed
                         return (
                             <rect
                                 x={x - barWidth / 2}
                                 y={y}
-                                width={barWidth}
+                                width={barWidth * 0.8}
                                 height={height}
-                                fill={isAsk ? "#ef4444" : "#22c55e"}
+                                stroke="transparent"
+                                strokeWidth={0.5}
+                                fill={
+                                    isNew
+                                        ? "orange"
+                                        : type === "ask"
+                                        ? "#b00108"
+                                        : "#00a63e"
+                                }
                             />
                         );
                     }}

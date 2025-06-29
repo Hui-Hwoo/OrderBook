@@ -1,33 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-
-type OrderTuple = [number, number];
-
-type OrderBookType = {
-    asks: OrderTuple[];
-    bids: OrderTuple[];
-};
+import type { OrderBookType, OrderItem } from "../types/order";
 
 type OrderTableType = {
-    asks: OrderTuple[];
-    bids: OrderTuple[];
-    newAsks: OrderTuple[];
-    newBids: OrderTuple[];
+    asks: OrderItem[];
+    bids: OrderItem[];
 };
 
-function areFloatsEqual(a: number, b: number, epsilon = 0.0001): boolean {
-    return Math.abs(a - b) < epsilon;
-}
-
-export function useOrderBook(frequency: number = 1000): OrderTableType {
-    const [order, setOrder] = useState<OrderTableType>({
+export function useOrderBook(frequency: number = 1000) {
+    const [orders, setOrders] = useState<OrderTableType>({
         asks: [],
         bids: [],
-        newAsks: [],
-        newBids: [],
+    });
+    const [rawData, setRawData] = useState<OrderBookType>({
+        asks: [],
+        bids: [],
     });
     const url = "https://zo-devnet.n1.xyz/orderbook?market_id=4";
 
-    const previousOrderRef = useRef<OrderBookType | null>(null);
+    const previousOrderRef = useRef<OrderTableType | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -38,56 +28,55 @@ export function useOrderBook(frequency: number = 1000): OrderTableType {
                 }
 
                 const newOrder: OrderBookType = await response.json();
+                setRawData(newOrder);
+                const { asks: previousAsks = [], bids: previousBids = [] } =
+                    previousOrderRef.current || {};
 
-                const previousOrder = previousOrderRef.current;
-
-                const previousAsks = previousOrder?.asks ?? [];
-                const previousBids = previousOrder?.bids ?? [];
-
-                const newAsks: OrderTuple[] = [];
-                const existingAsks: OrderTuple[] = [];
+                const newAsks: OrderItem[] = [];
 
                 for (const ask of newOrder.asks) {
+                    const askId = `${ask[0]}-${ask[1]}`;
                     const exists = previousAsks.some(
-                        (prev) =>
-                            areFloatsEqual(prev[0], ask[0]) &&
-                            areFloatsEqual(prev[1], ask[1])
+                        (prev) => prev.id === askId
                     );
-                    if (exists) {
-                        existingAsks.push(ask);
-                    } else {
-                        newAsks.push(ask);
-                    }
+
+                    const orderItem: OrderItem = {
+                        id: askId,
+                        price: ask[0],
+                        size: ask[1],
+                        isNew: !exists,
+                        type: "ask",
+                    };
+                    newAsks.push(orderItem);
                 }
 
-                const newBids: OrderTuple[] = [];
-                const existingBids: OrderTuple[] = [];
+                const newBids: OrderItem[] = [];
 
                 for (const bid of newOrder.bids) {
+                    const bidId = `${bid[0]}-${bid[1]}`;
                     const exists = previousBids.some(
-                        (prev) =>
-                            areFloatsEqual(prev[0], bid[0]) &&
-                            areFloatsEqual(prev[1], bid[1])
+                        (prev) => prev.id === bidId
                     );
-                    if (exists) {
-                        existingBids.push(bid);
-                    } else {
-                        newBids.push(bid);
-                    }
+
+                    const orderItem: OrderItem = {
+                        id: bidId,
+                        price: bid[0],
+                        size: bid[1],
+                        isNew: !exists,
+                        type: "bid",
+                    };
+                    newBids.push(orderItem);
                 }
 
-                // Simulate fake new orders
-                // newAsks.push([Math.floor(200000 + Math.random() * 100), 0]);
-                // newBids.push([Math.floor(200000 + Math.random() * 100), 0]);
-
                 // Save current order for next comparison
-                previousOrderRef.current = newOrder;
+                previousOrderRef.current = {
+                    asks: newAsks,
+                    bids: newBids,
+                };
 
-                setOrder({
-                    asks: existingAsks,
-                    bids: existingBids,
-                    newAsks,
-                    newBids,
+                setOrders({
+                    asks: newAsks,
+                    bids: newBids,
                 });
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -99,5 +88,8 @@ export function useOrderBook(frequency: number = 1000): OrderTableType {
         return () => clearInterval(interval);
     }, [url]);
 
-    return order;
+    return {
+        orders,
+        rawData,
+    };
 }
